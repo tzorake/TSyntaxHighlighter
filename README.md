@@ -1,2 +1,2 @@
 # TSyntaxHighlighter
-Syntax Highlighter written in Qt 5 & JavaScript
+Syntax Highlighter is written in Qt 5 & JavaScript
