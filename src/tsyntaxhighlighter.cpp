@@ -1,75 +1,106 @@
 #include "tsyntaxhighlighter.h"
+#include "helper.h"
 
-#include <QFile>
-#include <QQmlEngine>
+#include <QTextBlock>
+#include <QRegularExpression>
 
-bool readFile(const QString &sourceUrl, QString &sourceCode)
+TSyntaxHighlighter::TSyntaxHighlighter(QTextEdit *parent)
+    : QObject(parent)
 {
-    sourceCode = QString();
+    Helper::readFile(":/resources/styles/googlecode.css", m_styles);
 
-    QFile file(sourceUrl);
-    if (!file.open(QIODevice::ReadOnly)) {
-        qDebug() << QStringLiteral("Unable to find \"%1\"").arg(sourceUrl);
-        return false;
-    } else {
-        QTextStream stream(&file);
-        sourceCode = stream.readAll();
-        file.close();
-    }
-    return true;
+    QTextEdit *textEdit = static_cast<QTextEdit *>(parent);
+    QTextDocument *document = textEdit->document();
+
+    document->setDefaultStyleSheet(m_styles);
+
+    connect(textEdit, &QTextEdit::textChanged, this, &TSyntaxHighlighter::onTextChanged);
+    connect(&m_lexerWorker, &LexerWorker::processingFinished, this, &TSyntaxHighlighter::handleProcessingFinished);
 }
 
-TSyntaxHighlighter::TSyntaxHighlighter(QTextEdit *parent) : QObject(parent)
-{
-    readFile(":/resources/core.js", m_hljs);
-    readFile(":/resources/styles/googlecode.css", m_cssStyles);
-
-    m_engine = new QJSEngine(this);
-    m_engine->installExtensions(QJSEngine::Extension::AllExtensions);
-
-    QString program = QLatin1String("(function() { return ") + m_hljs + QLatin1String("})");
-    QJSValue programFunction = m_engine->evaluate(program);
-
-    QJSValue result = programFunction.call();
-    if (result.isError()) {
-        qWarning() << "Error evaluating script: " << result.toString();
-    }
-
-    QQmlEngine::setObjectOwnership(parent, QQmlEngine::CppOwnership);
-
-    m_engine->globalObject().setProperty("textEdit", m_engine->newQObject(parent));
-    m_engine->globalObject().setProperty("hljs", result);
-}
-
-void TSyntaxHighlighter::highlight()
+QPair<int, int> TSyntaxHighlighter::linesWithinViewport()
 {
     QTextEdit *textEdit = static_cast<QTextEdit *>(parent());
+
+    QRect rect = textEdit->viewport()->rect();
+    QTextCursor topCursor = textEdit->cursorForPosition(rect.topLeft());
+    QTextCursor bottomCursor = textEdit->cursorForPosition(rect.bottomLeft());
+
+    return QPair<int, int>(topCursor.blockNumber(), bottomCursor.blockNumber());
+}
+
+void TSyntaxHighlighter::onTextChanged()
+{
+    QTextEdit *textEdit = static_cast<QTextEdit *>(parent());
+    QString text = textEdit->toPlainText();
+    m_lexerWorker.processText(text);
+}
+
+void TSyntaxHighlighter::handleProcessingFinished(const QString &text)
+{
+    QTextEdit *textEdit = static_cast<QTextEdit *>(parent());
+    QTextDocument *document = textEdit->document();
+    QTextCursor cursor = textEdit->textCursor();
 
     {
         const QSignalBlocker blocker(textEdit);
 
-        QString code = textEdit->toPlainText();
-        QString program = QLatin1String(
-            "(function() { "
-                "const html = hljs.highlight(textEdit.plainText, {language: 'javascript'}).value; "
-                "return html;"
-            "})");
-        QJSValue programFunction = m_engine->evaluate(program);
+        QRegularExpression codeRegex("<pre><code class='javascript'>(.*?)</code></pre>", QRegularExpression::DotMatchesEverythingOption);
+        QRegularExpressionMatch match = codeRegex.match(text);
+        if (match.hasMatch()) {
+            QString text = match.captured(1);
+            QStringList lines = text.split("\n");
 
-        QJSValue result = programFunction.call();
-        if (result.isError()) {
-            qWarning() << "Error evaluating script: " << result.toString();
+            QPair<int, int> bounds = linesWithinViewport();
+
+            for (int i = bounds.first; i <= bounds.second; ++i) {
+                QTextBlock block = document->findBlockByLineNumber(i);
+                cursor.setPosition(block.position());
+                cursor.movePosition(QTextCursor::EndOfBlock, QTextCursor::KeepAnchor);
+                cursor.insertHtml(lines[i]);
+            }
         }
-
-        QTextCursor cursor = textEdit->textCursor();
-        m_cursorPosition = cursor.position();
-
-        textEdit->setHtml(
-            "<head><style>" + m_cssStyles + "</style></head>"
-            "<body><pre><code class='javascript'>" + result.toString() + "</code></pre></body>"
-        );
-
-        cursor.setPosition(m_cursorPosition);
-        textEdit->setTextCursor(cursor);
     }
+
+    textEdit->setTextCursor(cursor);
+
+//    {
+//        const QSignalBlocker blocker(textEdit);
+
+//        QTextDocument *document = textEdit->document();
+//        QTextCursor cursor = textEdit->textCursor();
+//        int cursorPosition = cursor.position();
+
+//        QRegularExpression codeRegex("<pre><code class='javascript'>(.*?)</code></pre>", QRegularExpression::DotMatchesEverythingOption);
+//        QRegularExpressionMatch match = codeRegex.match(text);
+
+////        QRegularExpression commentRegex("<span class=\"hljs-comment\">(.*?)</span>");
+
+//        if (match.hasMatch()) {
+//            QString text = match.captured(1);
+
+////            QRegularExpressionMatchIterator it;
+
+////            for (const QRegularExpressionMatch &match : commentRegex.globalMatch(text)) {
+////                QString m = match.captured(1);
+////                int start = match.capturedStart(1);
+////                int end = match.capturedEnd(1);
+////            }
+
+//            QStringList lines = text.split("\n");
+
+//            QTextCursor cursor = textEdit->textCursor();
+//            QPair<int, int> bounds = linesWithinViewport();
+
+//            for (int i = bounds.first; i <= bounds.second; ++i) {
+//                QTextBlock block = document->findBlockByLineNumber(i);
+//                cursor.setPosition(block.position());
+//                cursor.movePosition(QTextCursor::EndOfBlock, QTextCursor::KeepAnchor);
+//                cursor.insertHtml(lines[i]);
+//            }
+//        }
+
+//        cursor.setPosition(cursorPosition);
+//        textEdit->setTextCursor(cursor);
+//    }
 }

@@ -1,27 +1,26 @@
 #ifndef TSYNTAXHIGHLIGHTER_H
 #define TSYNTAXHIGHLIGHTER_H
 
+#include "lexerworker.h"
+
 #include <QObject>
-#include <QDebug>
 #include <QTextEdit>
-#include <QJSEngine>
 
 class TSyntaxHighlighter : public QObject
 {
     Q_OBJECT
 public:
-    explicit TSyntaxHighlighter(QTextEdit *parent);
+    explicit TSyntaxHighlighter(QTextEdit *parent = nullptr);
 
-public slots:
-    void highlight();
+    QPair<int, int> linesWithinViewport();
+
+private slots:
+    void onTextChanged();
+    void handleProcessingFinished(const QString &text);
 
 private:
-    int m_cursorPosition = 0;
-
-    QString m_hljs;
-    QString m_cssStyles;
-
-    QJSEngine *m_engine;
+    LexerWorker m_lexerWorker;
+    QString m_styles;
 };
 
 #endif // TSYNTAXHIGHLIGHTER_H

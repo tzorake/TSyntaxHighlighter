@@ -1,9 +1,8 @@
 #include "ttextedit.h"
-#include <QDebug>
 
-TTextEdit::TTextEdit(QWidget *parent) : QTextEdit(parent)
+TTextEdit::TTextEdit(QWidget *parent)
+    : QTextEdit(parent)
 {
+    setLineWrapMode(TTextEdit::LineWrapMode::NoWrap);
     m_highlighter = new TSyntaxHighlighter(this);
-
-    connect(this, &TTextEdit::textChanged, m_highlighter, &TSyntaxHighlighter::highlight);
 }

@@ -1,10 +1,10 @@
-#ifndef CUSTOMTEXTEDIT_H
-#define CUSTOMTEXTEDIT_H
+#ifndef TTEXTEDIT_H
+#define TTEXTEDIT_H
 
 #include "tsyntaxhighlighter.h"
 
+#include <QObject>
 #include <QTextEdit>
-#include <QTimer>
 
 class TTextEdit : public QTextEdit
 {
@@ -15,5 +15,4 @@ public:
 private:
     TSyntaxHighlighter *m_highlighter;
 };
-
-#endif // CUSTOMTEXTEDIT_H
+#endif // TTEXTEDIT_H

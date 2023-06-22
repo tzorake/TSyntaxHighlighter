@@ -18,7 +18,7 @@ public:
     ~MainWindow();
 
 private:
-    Ui::MainWindow *ui;
     TTextEdit *m_textEdit;
+    Ui::MainWindow *ui;
 };
 #endif // MAINWINDOW_H
